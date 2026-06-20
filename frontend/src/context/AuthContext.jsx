@@ -6,7 +6,11 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const API_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000/api`;
+  let baseApiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8000/api`;
+  if (baseApiUrl && !baseApiUrl.endsWith('/api') && !baseApiUrl.endsWith('/api/')) {
+    baseApiUrl = baseApiUrl.endsWith('/') ? `${baseApiUrl}api` : `${baseApiUrl}/api`;
+  }
+  const API_URL = baseApiUrl;
 
   useEffect(() => {
     if (token) {
