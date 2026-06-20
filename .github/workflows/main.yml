@@ -22,13 +22,16 @@ jobs:
       run: |
         cd backend
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        # Exclude easyocr in CI to avoid downloading 1.5GB of PyTorch on standard runners
+        grep -v "easyocr" requirements.txt > test_reqs.txt
+        pip install -r test_reqs.txt
         pip install pytest httpx
 
     - name: Run Backend Tests
       run: |
         cd backend
-        pytest app/tests/ -v
+        # python -m pytest ensures that backend is added to Python path
+        python -m pytest app/tests/ -v
 
   test-frontend:
     runs-on: ubuntu-latest
@@ -44,7 +47,8 @@ jobs:
     - name: Install Dependencies
       run: |
         cd frontend
-        npm install
+        # --legacy-peer-deps prevents React 19 / Vite peer conflict failures in CI
+        npm install --legacy-peer-deps
 
     - name: Build Frontend
       run: |
@@ -63,18 +67,17 @@ jobs:
       uses: actions/setup-buildx-action@v2
 
     - name: Log in to Docker Hub (or similar registry)
-      # Setup secret credentials in repository variables
       uses: docker/login-action@v2
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-      continue-on-error: true # Safe fallback if credentials not configured
+      continue-on-error: true
 
     - name: Build and Push Backend Image
       uses: docker/build-push-action@v4
       with:
         context: ./backend
-        push: false # Set to true once credentials secrets are configured
+        push: false
         tags: smartcare-backend:latest
 
     - name: Build and Push Frontend Image
