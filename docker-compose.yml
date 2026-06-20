@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: smartcare_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - smartcare_network
+
+  backend:
+    build: ./backend
+    container_name: smartcare_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - DATABASE_NAME=healthcare_db
+      - JWT_SECRET=8932789fbdsa78fb48392f498bcda9132f89fbdsa0203fcfdae23
+      - JWT_ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - UPLOAD_DIR=./uploads
+    volumes:
+      - backend_uploads:/workspace/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - smartcare_network
+
+  frontend:
+    build: ./frontend
+    container_name: smartcare_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - smartcare_network
+
+volumes:
+  mongo_data:
+  backend_uploads:
+
+networks:
+  smartcare_network:
+    driver: bridge
