@@ -59,7 +59,9 @@ class MockCollection:
         
     async def update_one(self, query, update):
         doc = await self.find_one(query)
-        if doc and "$push" in update:
+        if not doc:
+            return None
+        if "$push" in update:
             for k, v in update["$push"].items():
                 if k not in doc:
                     doc[k] = []
@@ -69,6 +71,9 @@ class MockCollection:
                         doc[k] = doc[k][v["$slice"]:]
                 else:
                     doc[k].append(v)
+        if "$set" in update:
+            for k, v in update["$set"].items():
+                doc[k] = v
         return doc
         
     def find(self, query):
@@ -84,6 +89,25 @@ class MockCollection:
             if match:
                 results.append(doc)
         return MockCursor(results)
+
+    async def delete_many(self, query):
+        initial_len = len(self.store)
+        new_store = []
+        for doc in self.store:
+            match = True
+            for k, v in query.items():
+                if k == "_id":
+                    if str(doc.get("_id")) != str(v):
+                        match = False
+                elif doc.get(k) != v:
+                    match = False
+            if not match:
+                new_store.append(doc)
+        self.store = new_store
+        class DeleteResult:
+            deleted_count = initial_len - len(self.store)
+        return DeleteResult()
+
 
 class MockDatabase:
     def __init__(self):

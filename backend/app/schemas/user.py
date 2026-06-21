@@ -34,3 +34,15 @@ class UserProfileResponse(BaseModel):
     gender: str
     vitals_history: List[VitalLogResponse] = []
     created_at: datetime
+
+class OTPSend(BaseModel):
+    email: EmailStr
+
+class OTPVerify(BaseModel):
+    email: EmailStr
+    otp: str
+    password: str
+    username: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, AuthProvider } from './context/AuthContext';
 import { 
   Activity, FileText, Calendar, ShieldCheck, Heart, User as UserIcon, 
-  ChevronRight, Upload, LogOut, Loader2, Sparkles, Plus, CheckCircle2, AlertTriangle, Info, Clock
+  ChevronRight, Upload, LogOut, Loader2, Sparkles, Plus, CheckCircle2, 
+  AlertTriangle, Info, Clock, Mail, Lock, KeyRound, Copy, Check
 } from 'lucide-react';
 
 const MainApp = () => {
@@ -874,148 +875,492 @@ const MainApp = () => {
 };
 
 const AuthPage = () => {
-  const { login, register } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
-  
-  // Fields
+  const { login, sendOtp, verifyOtp } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
   const [username, setUsername] = useState('');
   const [age, setAge] = useState('');
   const [gender, setGender] = useState('male');
+  
+  // Navigation & Authentication states
+  const [directPasswordLogin, setDirectPasswordLogin] = useState(false);
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
+  
+  // Mock notification inbox states
+  const [receivedOtp, setReceivedOtp] = useState('');
+  const [copied, setCopied] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleRequestOtp = async (e) => {
     e.preventDefault();
+    if (!email) return;
     setLoading(true);
     setErrorMsg('');
+    setInfoMsg('');
     try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await register(username, email, password, age, gender);
-        // Automatically switch to login on success
-        setIsLogin(true);
-        setErrorMsg('Registration successful. Please log in.');
+      const data = await sendOtp(email);
+      setIsRegistered(data.is_registered);
+      setOtpRequested(true);
+      setInfoMsg(`A temporary security code has been sent to ${email}.`);
+      if (data.debug_otp) {
+        setReceivedOtp(data.debug_otp);
+        // Automatically clear copy state
+        setCopied(false);
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Verification failed');
+      setErrorMsg(err.message || 'Failed to send security code. Please check your connection.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (!otp || !password) {
+      setErrorMsg('Please enter both the security code and password.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const registerDetails = {};
+      if (!isRegistered) {
+        // Collect registration details if new user
+        registerDetails.username = username || email.split('@')[0];
+        registerDetails.age = age ? parseInt(age) : 30;
+        registerDetails.gender = gender;
+      }
+      await verifyOtp(email, otp, password, registerDetails);
+      // Dismiss mock email notification on successful login
+      setReceivedOtp('');
+    } catch (err) {
+      setErrorMsg(err.message || 'Incorrect security code or verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordLogin = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setErrorMsg('Please enter both email and password.');
+      return;
+    }
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      await login(email, password);
+    } catch (err) {
+      setErrorMsg(err.message || 'Incorrect email or password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(receivedOtp);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl border border-slate-100 p-8 shadow-md space-y-6">
-        <div className="text-center space-y-2">
-          <div className="h-12 w-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mx-auto shadow-md">
-            <Activity className="h-6 w-6" />
-          </div>
-          <h1 className="text-xl font-bold text-slate-800">
-            {isLogin ? 'Sign In to SmartCare' : 'Create Patient Account'}
-          </h1>
-          <p className="text-xs text-slate-400">AI-Powered Smart Healthcare Assistant</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {!isLogin && (
-            <>
-              <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">Username</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  placeholder="e.g. JohnDoe"
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">Age</label>
-                  <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    required
-                    placeholder="34"
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">Gender</label>
-                  <select
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-                  >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="patient@example.com"
-              className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold text-slate-600 block mb-1">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-              className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-700 focus:border-indigo-500 focus:outline-none"
-            />
-          </div>
-
-          {errorMsg && (
-            <div className="p-3 bg-red-50 text-red-600 rounded-xl font-bold text-xs border border-red-200 text-center">
-              {errorMsg}
+    <div className="min-h-screen bg-slate-50 flex relative overflow-hidden font-sans">
+      
+      {/* Decorative Floating Glowing Blobs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-100/40 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-teal-100/35 blur-[120px] pointer-events-none" />
+      
+      {/* Container Wrapper */}
+      <div className="w-full flex flex-col md:flex-row z-10">
+        
+        {/* Left Side: Brand Panel */}
+        <div className="w-full md:w-1/2 bg-white/40 md:border-r border-slate-200/50 p-12 flex flex-col justify-between relative">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+              <Activity className="h-5 w-5" />
             </div>
-          )}
+            <div>
+              <span className="font-bold text-slate-800 text-lg tracking-tight block">SmartCare</span>
+              <span className="text-[10px] text-blue-600 font-bold uppercase tracking-wider">Clinical Intelligence Portal</span>
+            </div>
+          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-            {isLogin ? 'Sign In' : 'Register Account'}
-          </button>
-        </form>
+          <div className="my-auto max-w-lg py-12 md:py-0">
+            <span className="text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 mb-6">
+              <Sparkles className="h-3 w-3 text-blue-500" /> Patient Care Portal
+            </span>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 leading-tight tracking-tight">
+              AI-Powered <br/>
+              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-teal-600 bg-clip-text text-transparent">Healthcare Assistant</span>
+            </h1>
+            <p className="text-sm text-slate-500 mt-4 leading-relaxed font-medium">
+              Analyze symptom profiles with clinical classifiers, extract report metrics with automated OCR text recognition, and access personalized recovery guidelines.
+            </p>
 
-        <div className="text-center pt-2">
-          <button
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setErrorMsg('');
-            }}
-            className="text-xs font-bold text-slate-500 hover:text-indigo-600 transition"
-          >
-            {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
-          </button>
+            {/* Premium Feature Points */}
+            <div className="space-y-4 mt-8">
+              {[
+                { title: 'Symptom Checker', desc: 'Evaluates inputs against Random Forest & XGBoost classifiers', icon: Sparkles, iconBg: 'bg-blue-50 text-blue-600 border-blue-100/50' },
+                { title: 'Biomarker Extraction', desc: 'Parses pdf reports to highlight metrics and anomalies', icon: FileText, iconBg: 'bg-teal-50 text-teal-600 border-teal-100/50' },
+                { title: 'Secure Vault', desc: 'Compliant architecture securing critical logs and history', icon: ShieldCheck, iconBg: 'bg-indigo-50 text-indigo-600 border-indigo-100/50' },
+              ].map((feat, idx) => {
+                const IconComponent = feat.icon;
+                return (
+                  <div key={idx} className="flex gap-4 items-start p-3 hover:bg-slate-100/50 rounded-2xl border border-transparent hover:border-slate-100 transition duration-200">
+                    <div className={`h-9 w-9 rounded-xl flex items-center justify-center border shrink-0 ${feat.iconBg}`}>
+                      <IconComponent className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800">{feat.title}</h4>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">{feat.desc}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Trust Testimonial Card */}
+            <div className="bg-white border border-slate-200/60 rounded-2xl p-5 shadow-sm mt-8 space-y-3">
+              <div className="flex gap-1 text-amber-400">
+                <span className="text-sm">★</span>
+                <span className="text-sm">★</span>
+                <span className="text-sm">★</span>
+                <span className="text-sm">★</span>
+                <span className="text-sm">★</span>
+              </div>
+              <p className="text-slate-600 text-xs italic leading-relaxed">
+                "SmartCare has made it so easy for me to check my symptoms and keep track of my blood test panels. The interface is clean and extremely easy to use."
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[10px]">
+                  ES
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-slate-800 block">Emily S.</span>
+                  <span className="text-[10px] text-slate-400 block">Patient since 2024</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-[11px] text-slate-500 font-semibold flex items-center gap-1.5 mt-8 md:mt-0">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 block animate-pulse"></span>
+            HIPAA Compliant Data Processing
+          </div>
         </div>
+
+        {/* Right Side: Authentication Panel */}
+        <div className="w-full md:w-1/2 flex items-center justify-center p-8 md:p-16">
+          <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-8 shadow-xl space-y-6">
+            
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                {directPasswordLogin 
+                  ? 'Sign In with Password' 
+                  : otpRequested 
+                    ? 'Security Verification' 
+                    : 'Get Started with SmartCare'
+                }
+              </h2>
+              <p className="text-xs text-slate-400 font-medium">
+                {directPasswordLogin 
+                  ? 'Enter credentials to access your account' 
+                  : otpRequested 
+                    ? 'Enter the security code to verify access' 
+                    : 'Verify your email with a secure OTP code'
+                }
+              </p>
+            </div>
+
+            {/* Error or Success alerts */}
+            {errorMsg && (
+              <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl font-bold text-xs border border-rose-100 text-center flex items-center justify-center gap-1.5 animate-shake">
+                <AlertTriangle className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                {errorMsg}
+              </div>
+            )}
+
+            {infoMsg && (
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl font-bold text-xs border border-blue-100 text-center flex items-center justify-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                {infoMsg}
+              </div>
+            )}
+
+            {/* Authentication Forms */}
+            
+            {/* FLOW 1: Direct Password Login */}
+            {directPasswordLogin && (
+              <form onSubmit={handlePasswordLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="patient@example.com"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/10 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                  Sign In to Portal
+                </button>
+              </form>
+            )}
+
+            {/* FLOW 2: OTP Verification - Step 1: Request OTP */}
+            {!directPasswordLogin && !otpRequested && (
+              <form onSubmit={handleRequestOtp} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="patient@example.com"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !email}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/10 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Send Verification OTP
+                </button>
+              </form>
+            )}
+
+            {/* FLOW 2: OTP Verification - Step 2: Verify OTP & set password */}
+            {!directPasswordLogin && otpRequested && (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                
+                {/* Dynamically show new patient fields if email is unregistered */}
+                {!isRegistered && (
+                  <div className="space-y-4 border-b border-slate-100 pb-4 mb-4">
+                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl font-bold text-[10px] uppercase tracking-wider border border-emerald-100 text-center">
+                      ✨ New Patient Setup Required
+                    </div>
+                    
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Patient Username</label>
+                      <div className="relative">
+                        <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          required
+                          placeholder="e.g. John Doe"
+                          className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Age (Years)</label>
+                        <div className="relative">
+                          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <input
+                            type="number"
+                            value={age}
+                            onChange={(e) => setAge(e.target.value)}
+                            required
+                            placeholder="30"
+                            className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Gender</label>
+                        <div className="relative">
+                          <select
+                            value={gender}
+                            onChange={(e) => setGender(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition cursor-pointer appearance-none"
+                          >
+                            <option value="male" className="bg-white text-slate-800">Male</option>
+                            <option value="female" className="bg-white text-slate-800">Female</option>
+                            <option value="other" className="bg-white text-slate-800">Other</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Security OTP Code</label>
+                  <div className="relative">
+                    <KeyRound className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      maxLength="6"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value)}
+                      required
+                      placeholder="Enter 6-digit code"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none tracking-widest transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                    {!isRegistered ? 'Create Portal Password' : 'Confirm Password for Next Visits'}
+                  </label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      placeholder="Set password for future logins"
+                      className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 focus:outline-none transition"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !otp || !password}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-500/10 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Verify & Access Dashboard
+                </button>
+              </form>
+            )}
+
+            {/* Alternative Auth Switches */}
+            <div className="text-center pt-4 border-t border-slate-100 space-y-3">
+              <div>
+                <button
+                  onClick={() => {
+                    setDirectPasswordLogin(!directPasswordLogin);
+                    setErrorMsg('');
+                    setInfoMsg('');
+                    // Clear secondary state
+                    setOtpRequested(false);
+                  }}
+                  className="text-xs font-bold text-slate-400 hover:text-blue-600 transition"
+                >
+                  {directPasswordLogin 
+                    ? 'Or use email & security OTP code' 
+                    : 'Or sign in with email & password directly'
+                  }
+                </button>
+              </div>
+              
+              {otpRequested && !directPasswordLogin && (
+                <div>
+                  <button
+                    onClick={() => {
+                      setOtpRequested(false);
+                      setErrorMsg('');
+                      setInfoMsg('');
+                      setOtp('');
+                    }}
+                    className="text-[11px] font-bold text-blue-600 hover:underline"
+                  >
+                    Change Email / Resend Code
+                  </button>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+
       </div>
+
+      {/* Floating Mock Email Notification for OTP Simulation */}
+      {receivedOtp && (
+        <div className="fixed bottom-6 right-6 z-50 w-80 bg-white border border-blue-200 rounded-2xl shadow-2xl p-4 animate-bounce-in text-slate-800 overflow-hidden">
+          {/* Email Header */}
+          <div className="flex justify-between items-start mb-2 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <div className="h-6 w-6 bg-blue-50 rounded-md flex items-center justify-center text-blue-600">
+                <Mail className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wide block">Mock Mailbox</span>
+                <span className="text-[9px] text-slate-400 font-semibold block">SmartCare Verification</span>
+              </div>
+            </div>
+            <button 
+              onClick={() => setReceivedOtp('')}
+              className="text-xs font-semibold text-slate-400 hover:text-slate-600"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* Email Body */}
+          <div className="space-y-2">
+            <p className="text-[10px] text-slate-600 font-semibold leading-relaxed">
+              Hello! To access your SmartCare Clinical Portal, please verify using the security code below:
+            </p>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex justify-between items-center">
+              <span className="text-base font-extrabold tracking-widest text-blue-600 pl-1">{receivedOtp}</span>
+              <button 
+                onClick={copyToClipboard}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition"
+                title="Copy OTP"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+            <p className="text-[9px] text-slate-400 font-semibold">
+              This code will expire in 5 minutes. Set your password in the portal to log in faster next time!
+            </p>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
+
 
 const AppContent = () => {
   const { token, loading } = useAuth();

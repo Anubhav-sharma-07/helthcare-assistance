@@ -62,6 +62,49 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
+  const sendOtp = async (email) => {
+    const res = await fetch(`${API_URL}/auth/send-otp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.detail || 'Failed to send OTP');
+    }
+
+    const data = await res.json();
+    return data;
+  };
+
+  const verifyOtp = async (email, otp, password, registerDetails = {}) => {
+    const res = await fetch(`${API_URL}/auth/verify-otp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email,
+        otp,
+        password,
+        ...registerDetails
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.detail || 'OTP verification failed');
+    }
+
+    const data = await res.json();
+    localStorage.setItem('token', data.access_token);
+    setToken(data.access_token);
+    return data;
+  };
+
   const register = async (username, email, password, age, gender) => {
     const res = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
@@ -87,7 +130,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, login, register, logout, fetchUserProfile, API_URL }}>
+    <AuthContext.Provider value={{ token, user, loading, login, register, logout, fetchUserProfile, API_URL, sendOtp, verifyOtp }}>
       {children}
     </AuthContext.Provider>
   );

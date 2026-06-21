@@ -75,7 +75,7 @@ def load_custom_dataset(filepath: str) -> pd.DataFrame:
             raise ValueError("CSV dataset must contain a target column named 'disease', 'diseases', or 'Disease'.")
             
     # Check if sequential format is used (e.g. symptom_1, symptom_2, symptom_3)
-    symptom_cols = [c for c in df.columns if c.startswith("symptom")]
+    symptom_cols = [c for c in df.columns if (c.startswith("symptom_") and c[8:].isdigit()) or (c.startswith("symptom") and c[7:].isdigit())]
     
     if len(symptom_cols) > 0:
         print(f"Detected sequential symptom list format ({len(symptom_cols)} symptom columns). Converting to wide binary format...")
@@ -145,7 +145,7 @@ def main():
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     
     print(f"Training Random Forest Classifier on {len(X_train)} samples with {len(X.columns)} features...")
-    rf_model = RandomForestClassifier(n_estimators=100, random_state=42)
+    rf_model = RandomForestClassifier(n_estimators=50, max_depth=20, min_samples_leaf=4, n_jobs=-1, random_state=42)
     rf_model.fit(X_train, y_train)
     
     # Predict and print report
